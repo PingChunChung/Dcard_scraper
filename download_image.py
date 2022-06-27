@@ -2,6 +2,8 @@
 import requests as req
 import json
 from bs4 import BeautifulSoup as bs
+
+# 防止被擋下
 import cloudscraper
 from fake_useragent import UserAgent
 
@@ -9,7 +11,11 @@ from fake_useragent import UserAgent
 from time import sleep
 from random import randint
 
-import os 
+# 建資料夾
+import os
+
+# 正規表達式
+import re 
 
 
 
@@ -40,8 +46,8 @@ if not os.path.exists(file_path):
     
 
 
-articles = 30   #一頁幾篇文章
-pages = 10       #要爬幾次
+articles = 100   #一頁幾篇文章
+pages = 15       #要爬幾次
 page_attr = ''  #api最後一篇文章的元素
 ids = []        # 儲存文章的id
 img_urls = {}   # 儲存圖片url
@@ -61,10 +67,10 @@ for page in range(pages):
             ids.append(obj[i]['id'])
         
         page_attr = f'&before={ids[-1]}'
-        sleep(randint(1,10))
+        sleep(randint(1,5))
     
     except Exception:
-        sleep(randint(1,10))
+        sleep(randint(1,5))
         continue
 
 
@@ -76,17 +82,41 @@ for page in range(pages):
 
 
 
+# 存文章網址
+with open(f'{file_path}\img_urls.txt', 'a', encoding = 'utf-8') as file:
+    for link in img_urls.values():
+        file.write(link + '\n')
+    
+
+# 檔案名
+regex01 = r'(?<![a-zA-Z0-9])[A-Za-z0-9]{8}(?![a-zA-Z0-9])'
+regex02 = r'(?<![a-zA-Z0-9])[A-Za-z0-9]{7}(?![a-zA-Z0-9])'
+
 # 儲存檔案
 for link in img_urls.values():
-    if 'images' in link:
-        with open(f'{file_path}\{link[39:47]}.png', 'wb') as f:
-            f.write(req.get(link, 'lxml').content)
-    elif 'videos' in link:   #儲存影片
-        with open(f'{file_path}\{link[37:45]}.mp4', 'wb') as f:
-            res_video = req.get(link)
-            soup = bs(res_video.text, 'lxml')
-            url_video = soup.select_one('video#dc_player source')['src']
-            f.write(req.get(url_video).content)
-    elif link[-3:] == 'png' or 'jpg':  # 儲存圖片
-        with open(f'{file_path}\{link[-11:-3]}.png', 'wb') as f:
-            f.write(req.get(link, 'lxml').content)
+    try:
+        if 'images' in link:
+            with open(f'{file_path}\{re.search(regex01, link)[0]}.png', 'wb') as f:
+                f.write(req.get(link).content)
+        # 把yotube的連結排除
+        elif 'youtu' in link:
+            continue
+        # 儲存圖片
+        elif link[-3:] == 'png' or 'jpg' or 'peg':
+            with open(f'{file_path}\{re.search(regex01, link)[0]}.png', 'wb') as f:
+                f.write(req.get(link).content)
+                
+        #儲存影片
+        elif 'videos' in link:   
+            with open(f'{file_path}\{re.search(regex01, link)[0]}.mp4', 'wb') as f:
+                res_video = req.get(link)
+                soup = bs(res_video.text, 'lxml')
+                url_video = soup.select_one('video#dc_player_html5_api source')['src']
+                f.write(req.get(url_video).content)
+        else:
+            continue
+                
+    except Exception: # 有些圖只有7碼，避免存檔時錯誤
+        with open(f'{file_path}\{re.search(regex02, link)[0]}.png', 'wb') as f:
+            f.write(req.get(link).content)
+        continue
